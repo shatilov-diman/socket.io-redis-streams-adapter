@@ -41,6 +41,17 @@ function isRedisV4Client(redisClient: any) {
 }
 
 /**
+ * Whether the client comes from the `redis` package version 5
+ *
+ * @param redisClient
+ *
+ * @see https://github.com/redis/node-redis
+ */
+function isRedisV5Client(redisClient: any) {
+  return isRedisV4Client(redisClient) && typeof redisClient.withCommandOptions === "function";
+}
+
+/**
  * Map the output of the XREAD/XRANGE command with the ioredis package to the format of the redis package
  * @param result
  */
@@ -66,7 +77,22 @@ export function XREAD(
   offset: string,
   readCount: number
 ) {
-  if (isRedisV4Client(redisClient)) {
+  if (isRedisV5Client(redisClient)) {
+    return redisClient.withCommandOptions({
+      isolated: true,
+    }).xRead(
+      [
+        {
+          key: streamName,
+          id: offset,
+        },
+      ],
+      {
+        COUNT: readCount,
+        BLOCK: 5000,
+      }
+    );
+  } else if (isRedisV4Client(redisClient)) {
     return import("redis").then((redisPackage) => {
       return redisClient.xRead(
         redisPackage.commandOptions({
